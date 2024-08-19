@@ -48,6 +48,47 @@ $zenith = 90.83333;
 ## Usage
 To use the file in a page, simply invoke it using `<img src="sunposa.php" alt="sun/moon graph"/>`
 
+## Debugging
+The script includes some helpful debugging code to check for needed PHP settings/functions.
+Invoke with `https://your.website.com/sunposa.php?debug=y` and output similar to this will be shown.
+
+```
+------------------------------------------------------------------
+sunposa.php Version 3.01 - 19-Aug-2024
+..debug=y debugging output for sunposa.php.  PHP version 8.2.0
+  php.ini setting 'allow_url_fopen = true;'  (Note: this enables fetch of sun image).
+  Status of needed built-in PHP functions:
+  function 'imagecreatefrompng'  is available
+  function 'imagecreatefromjpeg'  is available
+  function 'imagecreatefromgif'  is available
+  function 'imagettfbbox'  is available
+  function 'imagettftext'  is available
+  function 'gregoriantojd'  is available
+  lat='37.2715', lon='-122.02274', tz='America/Los_Angeles', cacheFileDir='./cache/'
+  jpgraph location='./jpgraph-4.4.2-src-only/'
+  moon image cache './cache/jpmoon.png exists. Updated 2024-08-19 06:31:45
+  sun  image cache './cache/jpsun.png exists.  Updated 2024-08-19 08:28:18
+  GD Library is available:
+array (
+  'GD Version' => 'bundled (2.1.0 compatible)',
+  'FreeType Support' => true,
+  'FreeType Linkage' => 'with freetype',
+  'GIF Read Support' => true,
+  'GIF Create Support' => true,
+  'JPEG Support' => true,
+  'PNG Support' => true,
+  'WBMP Support' => true,
+  'XPM Support' => true,
+  'XBM Support' => true,
+  'WebP Support' => true,
+  'BMP Support' => true,
+  'AVIF Support' => true,
+  'TGA Read Support' => true,
+  'JIS-mapped Japanese Font Support' => false,
+)
+```
+Note that PHP gregoriantojd() function is required, along with the GD library with TTF functions enabled.
+
 ## Sample output at various times
 
 ![sunposa-0](https://github.com/user-attachments/assets/1b534200-22bf-48f1-baa1-613c9521a9dc)
