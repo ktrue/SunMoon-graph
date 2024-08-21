@@ -4,6 +4,9 @@ Create PNG image of Sun/Moon azimuth/elevation rise/set times using a PHP script
 This ***sunposa.php*** script is an update and repackaging of the original script which used Weather-Display *clientrawextra.txt* data for moon information.
 It is now independent of weather software used and is fully standalone.
 
+**NOTE:** V3.02 of the script expects latitudes to be Northern Hemisphere from +25 to +70 degrees North. Values outside that range produces quirky plots at this time
+
+Version 3.02 now uses curl to download the sun image from NASA instead of file_get_contents() function and now supports using an optional proxy server for the access.
 ## Contents
 +  **./jpgraph-4.4.2-src-only/** A source only for [JPGraph 4.4.2](https://jpgraph.net/download/) is included (under [QPL-1.0 license](http://www.opensource.org/licenses/qtpl.php)) for convenience.  The script can be changed to use your existing JPGraph installation if desired.
 +  **./cache/** storage for jpsun.png and jpmoon.png created by the script
@@ -40,6 +43,15 @@ $atlcolor   = 'midnightblue:0.9';           // Astronomical Twilight
 $nightcolor = 'midnightblue:0.7';
 $dawncolor  = 'lightskyblue:0.4';
 $zenith = 90.83333;
+#
+# optional uncomment to use Weather-Display clientrawextra.txt for moon instead of<br />
+#  the internal calculations
+#
+# $crextrafile = "./clientrawextra.txt"; // set location of WD clientrawextra file
+#
+# optional if proxy used - uncomment to use. Leave commented if no proxy server needed
+# $myProxy = 'proxyip:port';
+#
 ###############################################################
 #End of settings                                              #
 ###############################################################

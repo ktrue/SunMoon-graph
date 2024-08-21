@@ -20,10 +20,11 @@ ini_set('user_agent','Mozilla 5.0 (sunpos.php - saratoga-weather.org)');
 # Version 2.02 - 10-Oct-2022 - added check for allow_url_fopen=true in debugging
 # Version 3.00 - 18-Aug-2024 - added code from get-USNO-sunmoon.php to replace need for clientrawextra.txt
 # Version 3.01 - 19-Aug-2024 - code and comments cleanup
+# Version 3.02 - 21-Aug-2024 - add context to sun image fetch from NASA
 #
 # NOTE: requires jpgraph 4.4.0+ for operation with PHP 8+
 #
-$Version = 'sunposa.php Version 3.01 - 19-Aug-2024';
+$Version = 'sunposa.php Version 3.02 - 21-Aug-2024';
 // allow viewing of generated source
 
 if ( isset($_REQUEST['sce']) && strtolower($_REQUEST['sce']) == 'view' ) {
@@ -69,6 +70,15 @@ $atlcolor   = 'midnightblue:0.9';           // Astronomical Twilight
 $nightcolor = 'midnightblue:0.7';
 $dawncolor  = 'lightskyblue:0.4';
 $zenith = 90.83333;
+#
+# optional uncomment to use Weather-Display clientrawextra.txt for moon instead of<br />
+#  the internal calculations
+#
+# $crextrafile = "./clientrawextra.txt"; // set location of WD clientrawextra file
+#
+# optional if proxy used - uncomment to use. Leave commented if no proxy server needed
+# $myProxy = 'proxyip:port';
+#
 ###############################################################
 #End of settings                                              #
 ###############################################################
@@ -85,21 +95,27 @@ if (isset($SITE['cacheFileDir'])) {$cacheFileDir = $SITE['cacheFileDir']; }
 
 set_tz( $tz );
 
-$USNOdata = get_sunmoon($dateMDY,$lat,$lon,$tz);
-   
-if(isset($USNOdata['sunrise']))                 {$sunrise =     $USNOdata['sunrise']; }  
-if(isset($USNOdata['sunrisedate']))             {$sunrisedate = $USNOdata['sunrisedate']; }  
-if(isset($USNOdata['sunset']))                  {$sunset =      $USNOdata['sunset']; }  
-if(isset($USNOdata['sunsetdate']))              {$sunsetdate =  $USNOdata['sunsetdate']; }  
-if(isset($USNOdata['moonrise']))                {$moonrise =    $USNOdata['moonrise']; }  
-if(isset($USNOdata['moonrisedate']))            {$moonrisedate= $USNOdata['moonrisedate']; }  
-if(isset($USNOdata['moonset']))                 {$moonset =     $USNOdata['moonset']; }  
-if(isset($USNOdata['moonsetdate']))             {$moonsetdate = $USNOdata['moonsetdate']; }  
-if(isset($USNOdata['moonphase']))               {$moonphasename = $USNOdata['moonphase']; }  
-if(isset($USNOdata['illumination']))            {$moonillum = $USNOdata['illumination']; }  
-if(isset($USNOdata['hoursofpossibledaylight'])) {$hoursofpossibledaylight = $USNOdata['hoursofpossibledaylight'];}
-$moondata = new calcMoonPhase();
-$moonage = round($moondata->age() , 1); 
+if(isset($crextrafile) and file_exists($crextrafile)) {
+  # Use WD for moon data
+  $clientrawextra = explode(' ',file_get_contents($crextrafile));
+} else {
+  # Use internal calculations
+  $USNOdata = get_sunmoon($dateMDY,$lat,$lon,$tz);
+
+  if(isset($USNOdata['sunrise']))                 {$sunrise =     $USNOdata['sunrise']; }  
+  if(isset($USNOdata['sunrisedate']))             {$sunrisedate = $USNOdata['sunrisedate']; }  
+  if(isset($USNOdata['sunset']))                  {$sunset =      $USNOdata['sunset']; }  
+  if(isset($USNOdata['sunsetdate']))              {$sunsetdate =  $USNOdata['sunsetdate']; }  
+  if(isset($USNOdata['moonrise']))                {$moonrise =    $USNOdata['moonrise']; }  
+  if(isset($USNOdata['moonrisedate']))            {$moonrisedate= $USNOdata['moonrisedate']; }  
+  if(isset($USNOdata['moonset']))                 {$moonset =     $USNOdata['moonset']; }  
+  if(isset($USNOdata['moonsetdate']))             {$moonsetdate = $USNOdata['moonsetdate']; }  
+  if(isset($USNOdata['moonphase']))               {$moonphasename = $USNOdata['moonphase']; }  
+  if(isset($USNOdata['illumination']))            {$moonillum = $USNOdata['illumination']; }  
+  if(isset($USNOdata['hoursofpossibledaylight'])) {$hoursofpossibledaylight = $USNOdata['hoursofpossibledaylight'];}
+  $moondata = new calcMoonPhase();
+  $moonage = round($moondata->age() , 1); 
+}
 
 
 if(isset($_REQUEST['debug']) and $_REQUEST['debug'] = 'y') {
@@ -114,21 +130,35 @@ if(isset($_REQUEST['debug']) and $_REQUEST['debug'] = 'y') {
 		print "false;'  WARNING: this must =true to fetch the sun image.";
 	}
 	print "\n";
+  
 	$toCheck = array('imagecreatefrompng','imagecreatefromjpeg','imagecreatefromgif',
-									 'imagettfbbox','imagettftext','gregoriantojd');
+									 'imagettfbbox','imagettftext',
+                   'gregoriantojd',
+                  'curl_init','curl_setopt','curl_exec','curl_error','curl_getinfo','curl_close');
 
-	print "  Status of needed built-in PHP functions:\n";
+	print "\n  Status of needed built-in PHP functions:\n";
 
 	foreach ($toCheck as $n => $chkName) {
-		print "  function '$chkName' ";
+		print "  function '$chkName()' ";
 		if(function_exists($chkName)) {
 			print " is available\n";
 		} else {
 			print " is NOT available, but required\n";
 		}
   }
+  print "\n  Settings used:";
 	print "  lat='$lat', lon='$lon', tz='$tz', cacheFileDir='$cacheFileDir'\n";
 	print "  jpgraph location='$jploc'\n";
+  if (isset($crextrafile)) {
+    print "  Using '$crextrafile' for moon data.\n";
+    if(!file_exists($crextrafile)){
+      print "--Warning: '$crextrafile' not found!\n";
+    } else {
+      print "  '$crextrafile' last updated ".date("Y-m-d h:i:s",filemtime($crextrafile))."\n";
+    }
+  } else {
+    print "  Using internal calculations for moon data.\n";
+  }
 	print "  moon image cache '".$cacheFileDir.'jpmoon.png'." ";
 	if(file_exists($cacheFileDir.'jpmoon.png')) {
 		print "exists. Updated ".date("Y-m-d h:i:s",filemtime($cacheFileDir.'jpmoon.png'));
@@ -145,7 +175,7 @@ if(isset($_REQUEST['debug']) and $_REQUEST['debug'] = 'y') {
 	print "\n";
 	if(function_exists("gd_info")){
    $GDinfo = gd_info();
-	 print "  GD Library is available:\n";
+	 print "\n  GD Library is available:\n";
 	 print var_export($GDinfo,true)."\n";
 	} else {
 		print"-- Warning: GD library is required but does not seem to be enabled\n";
@@ -164,9 +194,11 @@ include ($jploc."src/jpgraph_date.php");
 if (!file_exists($cacheFileDir."jpmoon.png") or 
     (date("md") != date("md",filemtime($cacheFileDir."jpmoon.png"))) or
 		isset($_REQUEST['force']) ) {
-  
-	#$age = $clientrawextra[561]; # USE WD moonage value
-  $age = round($moonage);
+  if(isset($clientrawextra[561])){
+	  $age = $clientrawextra[561]; # USE WD moonage value
+  } else {
+    $age = round($moonage);
+  }
 	#$age -= (($age>14)?(($age>21)?2:1):0);
 	if ($age>28) { $age=28; }
 	$moonImage = $moonImagePath.(($age<10&&!strpos($age,'0'))?'0'.$age:$age).'.gif';
@@ -446,11 +478,13 @@ foreach ($b as $v) {
   $he1[] = $pos[1];
 }
 
-
-#$mrise = calcMoonPhaseawextra[558];
-$mrise = $moonrise;
-#$millum = $clientrawextra[560];
-$millum = $moonillum;
+if(isset($clientrawextra[560]) and isset($clientrawextra[558])) {
+  $mrise  = $clientrawextra[558];
+  $millum = $clientrawextra[560];
+} else {
+  $mrise = $moonrise;
+  $millum = $moonillum;
+}
 
 /* CREATE ACTUAL SUN POSITION */
 $time = time();
@@ -605,19 +639,25 @@ $graph->Add($sp2);
 // Add labels for equinox peaks	                
 $txt =new Text("Jun 21");
 $txt->SetFont(FF_ARIAL,FS_BOLD,7);
-$txt->SetPos( 237,40);
+#$txt->SetPos( 237,40);
+$txt->SetScalePos( 170,max($he0)+5);
 $txt->SetColor( "green");
 $graph->AddText($txt);	
+
 $txt1 =new Text("Dec 21");
 $txt1->SetFont(FF_ARIAL,FS_BOLD,7);
-$txt1->SetPos( 237,173);
+#$txt1->SetPos( 237,173);
+$txt1->SetScalePos( 170,max($he1)+5);
 $txt1->SetColor( "magenta");
 $graph->AddText($txt1);	
+
 $txt2 =new Text("Equinox");
 $txt2->SetFont(FF_ARIAL,FS_BOLD,7);
-$txt2->SetPos( 233,96);
+#$txt2->SetPos( 233,96);
+$txt2->SetScalePos( 170,max($he3)+5);
 $txt2->SetColor( "cyan");
 $graph->AddText($txt2);
+
 $txt3 =new Text("Moon EL: $he5[0]°");
 $txt3->SetFont(FF_ARIAL,FS_BOLD,8);
 $txt3->SetPos(408,276);
@@ -653,13 +693,22 @@ function saveImage($oldfile,$newfile,$width,$height)
 function maketransparent($oldfile,$newfile,$width,$height)
 // Turn black background transparent and re-size
 {
-	$info = getimagesize($oldfile);
+  global $myProxy,$cacheFileDir;
+  $tfileName = $cacheFileDir.'tempImg.gif';
+  $tfile = get_file_contents($oldfile);
+  if(!$tfile){
+    header('Content-type: text/plain,charset=ISO-8859-1');
+    print "..Oops .. unable to fetch '$oldfile' .. exiting.";
+    exit(0);
+  }
+  file_put_contents($tfileName,$tfile);
+	$info = getimagesize($tfileName);
 	if(!is_array($info)) {
 		if(!headers_sent() ) {header('Content-type: text/plain'); }
 		print "-- error fetching image size from $oldfile.  Unable to continue.\n";
 		exit(1);
 	}
-	$im = imagecreatefromgif($oldfile);
+	$im = imagecreatefromgif($tfileName);
 	if($im == false) {
 		if(!headers_sent() ) {header('Content-type: text/plain'); }
 		print "-- error fetching image file $oldfile for processing.  Unable to continue.\n";
@@ -675,6 +724,44 @@ function maketransparent($oldfile,$newfile,$width,$height)
 	imagepng($img,$newfile);
 	imagedestroy($img);
 }
+
+// FUNCTION - get data using cURL
+function get_file_contents($url)    {
+  global $myProxy,$Version;                                                          // set global
+  $data = '';
+
+  $ch = curl_init();                                                      // initialize a cURL session
+  curl_setopt($ch, CURLOPT_URL, $url);                                    // connect to provided URL
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);                            // don't verify peer certificate
+  curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 ('.$Version.')');
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);                            // 3 sec connection timeout
+  curl_setopt($ch, CURLOPT_TIMEOUT, 10);                                   // 2 sec data timeout
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);                         // return the data transfer
+//    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:58.0) Gecko/20100101 Firefox/58.0');
+  $curlHeaders =array(
+      "Cache-control: no-cache",
+      "Pragma: akamai-x-cache-on, akamai-x-get-request-id"
+    );
+  curl_setopt($ch, CURLOPT_HTTPHEADER,$curlHeaders); // request  format
+  if(isset($myProxy)) {
+    curl_setopt($ch, CURLOPT_PROXY, "$myProxy");
+  }
+  $data = curl_exec($ch); 
+  $cInfo = curl_getinfo($ch);
+  // execute session
+  if(curl_error($ch) <> '' or $cInfo['http_code'] !== 200) {                                             // IF there is an error
+   header('Content-type: text/plain,charset=ISO-8859-1');
+   print "$Version\n";
+   print "-- curl error: RC='".$cInfo['http_code']."' ". curl_error($ch) ." \n";                   //  display error notice
+   print "   URL: '$url' \n";
+   return('');
+  }
+
+  curl_close($ch);                                                        // close the cURL session
+  
+  return $data;                                                           // return data
+}// end get_file_contents
+
 
 function set_tz ($TZ){
 	if (phpversion() >= "5.1.0") {
