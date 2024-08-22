@@ -158,21 +158,21 @@ if(isset($_REQUEST['debug']) and $_REQUEST['debug'] = 'y') {
     if(!file_exists($crextrafile)){
       print "--Warning: '$crextrafile' not found!\n";
     } else {
-      print "  '$crextrafile' last updated ".date("Y-m-d h:i:s",filemtime($crextrafile))."\n";
+      print "  '$crextrafile' last updated ".date("Y-m-d H:i:s",filemtime($crextrafile))."\n";
     }
   } else {
     print "  Using internal calculations for moon data.\n";
   }
 	print "  moon image cache '".$cacheFileDir.'jpmoon.png'." ";
 	if(file_exists($cacheFileDir.'jpmoon.png')) {
-		print "exists. Updated ".date("Y-m-d h:i:s",filemtime($cacheFileDir.'jpmoon.png'));
+		print "exists. Updated ".date("Y-m-d H:i:s",filemtime($cacheFileDir.'jpmoon.png'));
 	} else {
 		print "does not exist.";
 	}
 	print "\n";
 	print "  sun  image cache '".$cacheFileDir.'jpsun.png'." ";
 	if(file_exists($cacheFileDir.'jpsun.png')) {
-		print "exists.  Updated ".date("Y-m-d h:i:s",filemtime($cacheFileDir.'jpsun.png'));
+		print "exists.  Updated ".date("Y-m-d H:i:s",filemtime($cacheFileDir.'jpsun.png'));
 	} else {
 		print "does not exist.";
 	}
