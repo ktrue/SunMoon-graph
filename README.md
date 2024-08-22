@@ -108,7 +108,9 @@ array (
   'AVIF Support' => true,
   'TGA Read Support' => true,
   'JIS-mapped Japanese Font Support' => false,
-)```
+)
+```
+
 Note that PHP gregoriantojd() function is required, along with the GD library with TTF functions enabled.
 
 ## Sample output at various times
