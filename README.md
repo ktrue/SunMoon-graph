@@ -67,20 +67,30 @@ Invoke with `https://your.website.com/sunposa.php?debug=y` and output similar to
 
 ```
 ------------------------------------------------------------------
-sunposa.php Version 3.01 - 19-Aug-2024
+sunposa.php Version 3.03 - 22-Aug-2024
 ..debug=y debugging output for sunposa.php.  PHP version 8.2.0
   php.ini setting 'allow_url_fopen = true;'  (Note: this enables fetch of sun image).
+
   Status of needed built-in PHP functions:
-  function 'imagecreatefrompng'  is available
-  function 'imagecreatefromjpeg'  is available
-  function 'imagecreatefromgif'  is available
-  function 'imagettfbbox'  is available
-  function 'imagettftext'  is available
-  function 'gregoriantojd'  is available
-  lat='37.2715', lon='-122.02274', tz='America/Los_Angeles', cacheFileDir='./cache/'
+  function 'imagecreatefrompng()'  is available
+  function 'imagecreatefromjpeg()'  is available
+  function 'imagecreatefromgif()'  is available
+  function 'imagettfbbox()'  is available
+  function 'imagettftext()'  is available
+  function 'gregoriantojd()'  is available
+  function 'curl_init()'  is available
+  function 'curl_setopt()'  is available
+  function 'curl_exec()'  is available
+  function 'curl_error()'  is available
+  function 'curl_getinfo()'  is available
+  function 'curl_close()'  is available
+
+  Settings used:  lat='37.2715', lon='-122.02274', tz='America/Los_Angeles', cacheFileDir='./cache/'
   jpgraph location='./jpgraph-4.4.2-src-only/'
-  moon image cache './cache/jpmoon.png exists. Updated 2024-08-19 06:31:45
-  sun  image cache './cache/jpsun.png exists.  Updated 2024-08-19 08:28:18
+  Using internal calculations for moon data.
+  moon image cache './cache/jpmoon.png exists. Updated 2024-08-22 05:55:56
+  sun  image cache './cache/jpsun.png exists.  Updated 2024-08-22 05:55:57
+
   GD Library is available:
 array (
   'GD Version' => 'bundled (2.1.0 compatible)',
@@ -98,8 +108,7 @@ array (
   'AVIF Support' => true,
   'TGA Read Support' => true,
   'JIS-mapped Japanese Font Support' => false,
-)
-```
+)```
 Note that PHP gregoriantojd() function is required, along with the GD library with TTF functions enabled.
 
 ## Sample output at various times
