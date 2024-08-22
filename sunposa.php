@@ -21,10 +21,11 @@ ini_set('user_agent','Mozilla 5.0 (sunpos.php - saratoga-weather.org)');
 # Version 3.00 - 18-Aug-2024 - added code from get-USNO-sunmoon.php to replace need for clientrawextra.txt
 # Version 3.01 - 19-Aug-2024 - code and comments cleanup
 # Version 3.02 - 21-Aug-2024 - add context to sun image fetch from NASA
+# Version 3.03 - 22-Aug-2024 - add $timeOnlyFormat to specify Sunrise, Sunset, Transit, Moonrise formats
 #
 # NOTE: requires jpgraph 4.4.0+ for operation with PHP 8+
 #
-$Version = 'sunposa.php Version 3.02 - 21-Aug-2024';
+$Version = 'sunposa.php Version 3.03 - 22-Aug-2024';
 // allow viewing of generated source
 
 if ( isset($_REQUEST['sce']) && strtolower($_REQUEST['sce']) == 'view' ) {
@@ -59,8 +60,9 @@ $cacheFileDir = './cache/';        //overridden by $SITE['cacheFileDir']
 $moonImagePath = './moonimg/NH-moon'; //moon images NH-moon - Norhern Hemisphere
 #$moonImagePath = './moonimg/SH-moon'; //moon images SH-moon - Southern Hemisphere
 
-$dtstring   = "M j Y g:ia";         // format for the date & time
-$dateMDY    = true;  // =true for mm/dd/yyyy, =false for dd/mm/yyyy format
+$dtstring   = "M j Y g:ia";         // format for the date & time in title
+$dateMDY    = true;  // =true for mm/dd/yyyy, =false for dd/mm/yyyy format overridden by $SITE['WDdateMDY']
+$timeOnlyFormat = 'g:ia';     //='H:i' or ='g:ia' overridden by $SITE['timeOnlyFormat']
 #
 # you likely do not have to configure the following:
 $daycolor   = 'lightskyblue';
@@ -92,6 +94,8 @@ if (isset($SITE['latitude'])) 	{$lat = $SITE['latitude'];}
 if (isset($SITE['longitude'])) 	{$lon = $SITE['longitude'];}
 if (isset($SITE['tz'])) 	{$tz = $SITE['tz'];}
 if (isset($SITE['cacheFileDir'])) {$cacheFileDir = $SITE['cacheFileDir']; }
+if (isset($SITE['timeOnlyFormat'])) {$timeOnlyFormat = $SITE['timeOnlyFormat']; }
+if (isset($SITE['WDdateMDY'])) {$dateMDY = $SITE['WDdateMDY']; }
 
 set_tz( $tz );
 
@@ -420,9 +424,9 @@ if ($final_minutes <= 9){$final_minutes = "0" . $final_minutes;}
 $dl = $final_hours = floor($hours) . ":" . $final_minutes;
 ######################################################################
 
-$sr = date("h:i a",$sun_info["sunrise"]);
-$zen = date("h:i a",$sun_info["transit"]);
-$ss = date("h:i a",$sun_info["sunset"]);
+$sr = date($timeOnlyFormat,$sun_info["sunrise"]);
+$zen = date($timeOnlyFormat,$sun_info["transit"]);
+$ss = date($timeOnlyFormat,$sun_info["sunset"]);
 
 $b = array();
 $a = ($sun_info["transit"]-36000);

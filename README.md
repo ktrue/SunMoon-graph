@@ -32,8 +32,9 @@ $cacheFileDir = './cache/';        //overridden by $SITE['cacheFileDir']
 $moonImagePath = './moonimg/NH-moon'; //moon images NH-moon - Norhern Hemisphere
 #$moonImagePath = './moonimg/SH-moon'; //moon images SH-moon - Southern Hemisphere
 
-$dtstring   = "M j Y g:ia";         // format for the date & time
-$dateMDY    = true;  // =true for mm/dd/yyyy, =false for dd/mm/yyyy format
+$dtstring   = "M j Y g:ia";         // format for the date & time in title
+$dateMDY    = true;  // =true for mm/dd/yyyy, =false for dd/mm/yyyy format overridden by $SITE['WDdateMDY']
+$timeOnlyFormat = 'g:ia';     //='H:i' or ='g:ia' overridden by $SITE['timeOnlyFormat']
 #
 # you likely do not have to configure the following:
 $daycolor   = 'lightskyblue';
