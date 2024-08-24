@@ -4166,7 +4166,7 @@ class Ticks extends stdClass {
     public $direction=1; // Should ticks be in(=1) the plot area or outside (=-1)
     public $supress_last=false,$supress_tickmarks=false,$supress_minor_tickmarks=false;
     public $maj_ticks_pos = array(), $maj_ticklabels_pos = array(),
-           $ticks_pos = array(), $maj_ticks_label = array();
+           $ticks_pos = array(), $ticks_label = array(), $maj_ticks_label = array();
     public $precision;
 
     protected $minor_abs_size=3, $major_abs_size=5;
