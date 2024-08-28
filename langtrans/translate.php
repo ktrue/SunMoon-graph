@@ -24,8 +24,8 @@ $key = '-specify-key-here-';
 
 # Includes the autoloader for libraries installed with composer
 # change for your installation
-#require 'vendor/autoload.php';
-require 'c:/xampp/vendor/autoload.php';
+require 'vendor/autoload.php';
+#require 'c:/xampp/vendor/autoload.php';
 
 # our language v.s. ISO691 language name table
 # uncomment the one(s) to regenerate -- recommend select no more than 5 at a time
