@@ -5,7 +5,7 @@ The initial lang-LL.txt files were generated using Google Translate V1 API to tr
 the English legends to the target language and character set compatible with the Saratoga
 template set.
 
-Most translations use ISO-9959-1 (Western European).  Some translations use other
+Most translations use ISO-8859-1 (Western European).  Some translations use other
 character sets.  Each file has a 'charset' => '...', entry indicating which encoding
 should be used.
 
