@@ -1,0 +1,33 @@
+<?php
+$trans_en =array (
+  'en' => 
+  array (
+    'charset' => 'ISO-8859-1',
+    'Solar Noon' => 'Solar Noon|used in Title',
+    'Solar Midnight' => 'Solar Midnight|used in Title',
+    'Dusk' => 'Dusk|used in Title',
+    'Dawn' => 'Dawn|used in Title',
+    'Sunset' => 'Sunset|used in Title and Legend',
+    'Sunrise' => 'Sunrise|used in Title and Legend',
+    'Sunlight' => 'Sunlight|used in Legend',
+    'hrs' => 'hours|Abbreviated \'hours\' used in Legend',
+    'Afternoon' => 'Afternoon|used in Title',
+    'Morning' => 'Morning|used in Title',
+    'Civil Twilight' => 'Civil Twilight|used in Title',
+    'Nautical Twilight' => 'Nautical Twilight|used in Title',
+    'Astronomical Twilight' => 'Astronomical Twilight|used in Title',
+    'Twilight' => 'Twilight|spare',
+    'Nighttime' => 'Nighttime|used in Title',
+    'local time' => 'local time|used in Title',
+    'Sun AZ' => 'Sun AZ|Abbreviated \'Sun Azimuth\' in Legend',
+    'Zenith' => 'Zenith|Zenith',
+    'Sun EL' => 'Sun elevation|Abbreviated \'Sun Elevation\' in Legend',
+    'Moon EL' => 'Moon elevation|Abbreviated \'Moon Elevation\' in Legend',
+    'Moonrise' => 'Moonrise|used in Legend',
+    'Illumination' => 'Illumination|\'Moon Illumination percentage\' in Legend',
+    'Sun/Moon position' => 'Sun/Moon position|used in Title',
+    'Jun 21' => 'Summer Solstice|used in graph for Summer Solstice date legend',
+    'Dec 21' => 'Winter Solstice|used in graph for Winter Solstice date legend',
+    'Equinox' => 'Equinox|used in graph for Spring/Autumn Equinox legend',
+  ),
+);
