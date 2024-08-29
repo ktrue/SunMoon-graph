@@ -62,7 +62,7 @@ $lang = 'en';  # Default language for legends (see set_legends() function for co
 #
 # optional uncomment to enable export of sun/moon data to ./calc-sunmoon-data.php for debugging
 # and comparison with USNO using get-usno-data=>usno-sunmoon-data.php and check-sunmoon-data.php
-$doLog = true;
+$doLog = false;  # =true; to enable
 ###############################################################
 #End of settings                                              #
 ###############################################################
