@@ -12,6 +12,9 @@ Version 3.02 now uses curl to download the sun image from NASA instead of file_g
 +  **./cache/** storage for jpsun.png and jpmoon.png created by the script
 +  **./moonimg/** collection of Northern and Southern hemisphere moon images for each day in the lunar cycle
 +  **sunposa.php** the script to generate the image .png
++  **sunposa-lang.php** (new V3.50) the language lookup for legends
++  **wxastronomy.php** replacement page in Saratoga template to display the graphic
++  **./langtrans/** directory for raw language translations in native character sets (see below to update your own **sunposa-lang.php** )
 
 # Settings
 Internal settings in the script are shown below and are active if used outside a Saratoga website template.  Inside a Saratoga wx...php page, needed configurations are gathered from your *Settings.php* file and no additional configuration is needed.
@@ -32,9 +35,9 @@ $cacheFileDir = './cache/';        //overridden by $SITE['cacheFileDir']
 $moonImagePath = './moonimg/NH-moon'; //moon images NH-moon - Norhern Hemisphere
 #$moonImagePath = './moonimg/SH-moon'; //moon images SH-moon - Southern Hemisphere
 
-$dtstring   = "M j Y g:ia";         // format for the date & time in title
-$dateMDY    = true;  // =true for mm/dd/yyyy, =false for dd/mm/yyyy format overridden by $SITE['WDdateMDY']
-$timeOnlyFormat = 'g:ia';     //='H:i' or ='g:ia' overridden by $SITE['timeOnlyFormat']
+$dateMDY    = false;  // =true for mm/dd/yyyy, =false for dd/mm/yyyy format overridden by $SITE['WDdateMDY']
+$timeOnlyFormat = 'H:i';     // ='H:i' or ='g:ia' overridden by $SITE['timeOnlyFormat']
+$dtstring   = "M j Y";  // ='M j Y ' for Mon d yyyy format for the date & time in title
 #
 # you likely do not have to configure the following:
 $daycolor   = 'lightskyblue';
@@ -44,6 +47,10 @@ $atlcolor   = 'midnightblue:0.9';           // Astronomical Twilight
 $nightcolor = 'midnightblue:0.7';
 $dawncolor  = 'lightskyblue:0.4';
 $zenith = 90.83333;
+# customize default languages
+$lang = 'en';  # Default language for legends (see set_legends() function for configuration)
+# test:
+#$lat=55.8983; $lon=-3.2077; $tz='Europe/London';
 #
 # optional uncomment to use Weather-Display clientrawextra.txt for moon instead of<br />
 #  the internal calculations
@@ -53,6 +60,9 @@ $zenith = 90.83333;
 # optional if proxy used - uncomment to use. Leave commented if no proxy server needed
 # $myProxy = 'proxyip:port';
 #
+# optional uncomment to enable export of sun/moon data to ./calc-sunmoon-data.php for debugging
+# and comparison with USNO using get-usno-data=>usno-sunmoon-data.php and check-sunmoon-data.php
+$doLog = true;
 ###############################################################
 #End of settings                                              #
 ###############################################################
@@ -67,14 +77,14 @@ Invoke with `https://your.website.com/sunposa.php?debug=y` and output similar to
 
 ```
 ------------------------------------------------------------------
-sunposa.php Version 3.03 - 22-Aug-2024
-..debug=y debugging output for sunposa.php.  PHP version 8.2.0
-  php.ini setting 'allow_url_fopen = true;'  (Note: this enables fetch of sun image).
+sunposa.php Version 3.50 - 28-Aug-2024
+..debug=y debugging output for sunposa.php.  PHP version 8.1.29
 
   Status of needed built-in PHP functions:
   function 'imagecreatefrompng()'  is available
-  function 'imagecreatefromjpeg()'  is available
   function 'imagecreatefromgif()'  is available
+  function 'imagecreatetruecolor()'  is available
+  function 'imagecolortransparent()'  is available
   function 'imagettfbbox()'  is available
   function 'imagettftext()'  is available
   function 'gregoriantojd()'  is available
@@ -85,54 +95,58 @@ sunposa.php Version 3.03 - 22-Aug-2024
   function 'curl_getinfo()'  is available
   function 'curl_close()'  is available
 
-  Settings used:  lat='37.2715', lon='-122.02274', tz='America/Los_Angeles', cacheFileDir='./cache/'
+  Settings used:  lat='37.27153397', lon='-122.02274323', tz='America/Los_Angeles', cacheFileDir='./cache/'
   jpgraph location='./jpgraph-4.4.2-src-only/'
   Using internal calculations for moon data.
-  moon image cache './cache/jpmoon.png exists. Updated 2024-08-22 05:55:56
-  sun  image cache './cache/jpsun.png exists.  Updated 2024-08-22 05:55:57
+  moon image cache './cache/jpmoon.png exists. Updated 2024-08-28 09:00:03
+  sun  image NASA  './cache/tempImg.gif exists.  Updated 2024-08-28 16:27:51
+  sun  image cache './cache/jpsun.png exists.  Updated 2024-08-28 16:27:51
 
-  GD Library is available:
-array (
-  'GD Version' => 'bundled (2.1.0 compatible)',
-  'FreeType Support' => true,
-  'FreeType Linkage' => 'with freetype',
-  'GIF Read Support' => true,
-  'GIF Create Support' => true,
-  'JPEG Support' => true,
-  'PNG Support' => true,
-  'WBMP Support' => true,
-  'XPM Support' => true,
-  'XBM Support' => true,
-  'WebP Support' => true,
-  'BMP Support' => true,
-  'AVIF Support' => true,
-  'TGA Read Support' => true,
-  'JIS-mapped Japanese Font Support' => false,
-)
-```
+  GD Library is available and has these capabilities:
+    GD Version: bundled (2.1.0 compatible)
+    FreeType Support: true
+    FreeType Linkage: with freetype
+    GIF Read Support: true
+    GIF Create Support: true
+    JPEG Support: true
+    PNG Support: true
+    WBMP Support: true
+    XPM Support: true
+    XBM Support: true
+    WebP Support: true
+    BMP Support: true
+    AVIF Support: false
+    TGA Read Support: true
+    JIS-mapped Japanese Font Support: false```
 
 Note that PHP gregoriantojd() function is required, along with the GD library with TTF functions enabled.
+```
+## Changing the language translations
 
-## Sample output at various times
+In the **./langtrans/** directory are the individual language files.  Please see the **README-langtrans.txt** file
+in that directory for instructions on how to change the language presented.  It's a bit tricky to do, but following the instructions there should result in success. Good luck...
 
-![sunposa-0](https://github.com/user-attachments/assets/1b534200-22bf-48f1-baa1-613c9521a9dc)
+## Checking the computed data v.s. USNO
 
-![sunposa-1](https://github.com/user-attachments/assets/2ce76ec7-72e0-4b4c-9a60-bfbf88da6b8b)
+Two utility programs are included to do a comparison of the azimuth,elevation values that are computed in **sunposa.php** versus the US Naval Observatory data for the same date.
 
-![sunposa-3](https://github.com/user-attachments/assets/c05b9f09-99d5-4283-bbe9-d90ec5cd32c6)
+In **sunposa.php** the '$doLog = true;` allows creation of **calc-sunmoon-data.php**, one of the files needed by the utility.
 
-![sunposa-4](https://github.com/user-attachments/assets/4f8e337f-2d49-465a-af9b-6b6c2c62f319)
+Run **get-usno-data.php** to create **usno-sunmoon-data.php** in the same directory.
 
-![sunposa-5](https://github.com/user-attachments/assets/44f9ebc6-9639-4702-8739-f1b032db4841)
+Then you can run **check-sunmoon-data.php** to compare the results.  The output to your browser looks like:
 
-![sunposa-6](https://github.com/user-attachments/assets/6fbbcab4-3e23-46a4-9d65-21b1acf75f0d)
+## Sample output with various languages
 
-![sunposa-8](https://github.com/user-attachments/assets/9813be36-0ac9-41cf-a072-eb6f8df923eb)
+![sunmoon-sample-en](https://github.com/user-attachments/assets/c4cdf96f-9adb-4595-9c2a-be925f0e2d97)
 
+![sunmoon-sample-es](https://github.com/user-attachments/assets/a8e17218-85b1-40e7-815c-79d166412237)
 
+![sunmoon-sample-fr](https://github.com/user-attachments/assets/330a546c-ce02-45f5-91f4-b5b197e1efea)
 
+![sunmoon-sample-el](https://github.com/user-attachments/assets/747000b9-c20d-44b1-9790-f6e52ba0fc86)
 
-
+![sunmoon-sample-pl](https://github.com/user-attachments/assets/4d995dd6-bf10-4227-8986-d7276fdc2277)
 
 
 
