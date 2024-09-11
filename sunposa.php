@@ -21,11 +21,12 @@ ini_set('display_errors','1');
 # Version 3.01 - 19-Aug-2024 - code and comments cleanup
 # Version 3.02 - 21-Aug-2024 - add context to sun image fetch from NASA
 # Version 3.03 - 22-Aug-2024 - add $timeOnlyFormat to specify Sunrise, Sunset, Transit, Moonrise formats
-# Version 3.50 - 26-Aug-2024 - add debug for NASA sun image,mods to gradient backgrounds+legends + legend lang translate
+# Version 3.50 - 28-Aug-2024 - add debug for NASA sun image,mods to gradient backgrounds+legends + legend lang translate
+# Version 3.60 - 11-Sep-2024 - fixes to display Southern Hemisphere graphs, add optional debugging info 
 #
 # NOTE: requires jpgraph 4.4.2+ for operation with PHP 8+
 #
-$Version = 'sunposa.php Version 3.50 - 28-Aug-2024';
+$Version = 'sunposa.php Version 3.60 - 11-Sep-2024';
 // allow viewing of generated source
 
 if ( isset($_REQUEST['sce']) && strtolower($_REQUEST['sce']) == 'view' ) {
@@ -48,54 +49,61 @@ if ( isset($_REQUEST['sce']) && strtolower($_REQUEST['sce']) == 'view' ) {
 #Settings                                                     #
 ###############################################################
 #
+/*  GLOBAL VARIABLES */
 $jploc = './jpgraph-4.4.2-src-only/';  // relative location of jpgraph library
 
-/*  GLOBAL VARIABLES */
 $lat = 37.2715;              //overridden by $SITE['latitude']
 //Note! longitude is west negative
 $lon = -122.02274;           //overridden by $SITE['longitude'];
 $tz = "America/Los_Angeles"; //overridden by $SITE['tz']
 $cacheFileDir = './cache/';        //overridden by $SITE['cacheFileDir']
 //
-$moonImagePath = './moonimg/NH-moon'; //moon images NH-moon - Norhern Hemisphere
-#$moonImagePath = './moonimg/SH-moon'; //moon images SH-moon - Southern Hemisphere
-
 $dateMDY    = false;  // =true for mm/dd/yyyy, =false for dd/mm/yyyy format overridden by $SITE['WDdateMDY']
 $timeOnlyFormat = 'H:i';     // ='H:i' or ='g:ia' overridden by $SITE['timeOnlyFormat']
 $dtstring   = "M j Y";  // ='M j Y ' for Mon d yyyy format for the date & time in title
 #
+# default language
+$lang = 'en';  # Default language for legends - Will be overridden by $SITE['lang'] or by
+#                $_SESSION['lang'] for Saratoga templates
+#
+# optional uncomment $crextrafile to use Weather-Display clientrawextra.txt for moon instead of
+#  the internal calculations
+#
+# $crextrafile = "./clientrawextra.txt"; // set location of WD clientrawextra file
+#
+# optional $myProxy 
+# if proxy used - uncomment to use. Leave commented if no proxy server needed
+#
+# $myProxy = 'proxyip:port';
+#
+# optional uncomment $doLog to enable export of sun/moon data to ./calc-sunmoon-data.php for debugging
+# and comparison with USNO using get-usno-data=>usno-sunmoon-data.php and check-sunmoon-data.php
+$doLog = false;
+#
 # you likely do not have to configure the following:
+# 
 $daycolor   = 'lightskyblue';
 $ctlcolor   = 'skyblue:0.6';           // Civil Twilight
 $ntlcolor   = 'skyblue:0.6';           // Nautical Twilight
 $atlcolor   = 'midnightblue:0.9';           // Astronomical Twilight
 $nightcolor = 'midnightblue:0.7';
 $dawncolor  = 'lightskyblue:0.4';
+$legendColor = 'orange';          // color for title/legend text
+$maxElevation = 90;               // graph Y-scale max (in integer degrees) default=90
 $zenith = 90.83333;
-# customize default languages
-$lang = 'en';  # Default language for legends (see set_legends() function for configuration)
-# test:
-#$lat=55.8983; $lon=-3.2077; $tz='Europe/London';
 #
-# optional uncomment to use Weather-Display clientrawextra.txt for moon instead of<br />
-#  the internal calculations
-#
-# $crextrafile = "./clientrawextra.txt"; // set location of WD clientrawextra file
-#
-# optional if proxy used - uncomment to use. Leave commented if no proxy server needed
-# $myProxy = 'proxyip:port';
-#
-# optional uncomment to enable export of sun/moon data to ./calc-sunmoon-data.php for debugging
-# and comparison with USNO using get-usno-data=>usno-sunmoon-data.php and check-sunmoon-data.php
-$doLog = true;
+# Note: $moonImagePath will auto-adjust if $lat < 0 (for Southern Hemisphere moons)
+# so you don't need to change this
+$moonImagePath = './moonimg/NH-moon'; //moon images NH-moon - Norhern Hemisphere
 ###############################################################
 #End of settings                                              #
 ###############################################################
 
-if(file_exists("Settings.php")) { include_once("Settings.php"); }
+if(file_exists("Settings.php") and !isset($_GET['nosettings'])) { include_once("Settings.php"); }
 
-global $SITE,$Debug,$LanguageLookup;
+global $SITE,$Debug,$LanguageLookup,$doLog,$Dtrack;
 $Debug = "";
+$Dtrack = "";
 
 if (isset($SITE['latitude'])) 	{$lat = $SITE['latitude'];}
 if (isset($SITE['longitude'])) 	{$lon = $SITE['longitude'];}
@@ -124,6 +132,30 @@ if (isset($LanguageLookup['charset']) and $LanguageLookup['charset'] !== 'ISO-88
   #file_put_contents('sunposa-after-lang.txt',var_export($LanguageLookup,true));
   
 }
+$locations = array(
+  # test locations for script
+  'StJohns'  => '47.56178,-52.71697,America/St_Johns',
+  'Saratoga' => '37.2715,-122.02274,America/Los_Angeles',
+  'Hawaii'   => '20.86047,-156.31507,Pacific/Honolulu',
+  'Alaska'   => '61.21826,-149.84967,America/Anchorage',
+  'London'   => '51.46485,-0.16287,Europe/London',
+  'Stockholm'=> '59.31521,18.0515,Europe/Stockholm',
+  'Athens'   => '37.98489,23.73002,Europe/Athens',
+  'Windhoek' => '-22.57148,17.08455,Africa/Windhoek',
+  'Perth'    => '-32.01662,115.90768,Australia/Perth',
+  'Hobart'   => '-41.428945,148.272474,Australia/Hobart',
+  'Auckland' => '-36.8636,174.76457,Pacific/Auckland',
+);
+
+$subtitle = '';
+if(isset($_GET['loc']) and isset($locations[$_GET['loc']])) {
+  list($lat,$lon,$tz) = explode(',',$locations[$_GET['loc']]);
+  set_tz( $tz );
+  $subtitle = "Using ".$_GET['loc'].": $lat,$lon,$tz(GMT ".date('P').")";
+}
+  
+
+if($maxElevation > 90 or $maxElevation < 40 ) {$maxElevation = 90;}
 
 if(isset($crextrafile) and file_exists($crextrafile)) {
   # Use WD for moon data
@@ -146,7 +178,12 @@ if(isset($crextrafile) and file_exists($crextrafile)) {
   $moondata = new calcMoonPhase();
   $moonage = round($moondata->age() , 1); 
 }
-
+# ensure correct moon image is used
+if($lat < 0) {
+  $moonImagePath = str_replace('NH-moon','SH-moon',$moonImagePath);
+} else {
+  $moonImagePath = str_replace('SH-moon','NH-moon',$moonImagePath);
+}
 
 if(isset($_REQUEST['debug']) and $_REQUEST['debug'] = 'y') {
 	if(!headers_sent()) {header('Content-type: text/plain');} else {print "<pre>\n";}
@@ -170,9 +207,19 @@ if(isset($_REQUEST['debug']) and $_REQUEST['debug'] = 'y') {
 			print " is NOT available, but required\n";
 		}
   }
-  print "\n  Settings used:";
-	print "  lat='$lat', lon='$lon', tz='$tz', cacheFileDir='$cacheFileDir'\n";
+  print "\n  Settings used:\n";
+	print "  lat='$lat', lon='$lon', tz='$tz'\n";
+  print "  cacheFileDir='$cacheFileDir'\n";
+  print "  moonImagePath='$moonImagePath'\n";
+  print "  legendColor='$legendColor' maxElevation='$maxElevation'\n";
+  if(!file_exists($moonImagePath."14.gif")) {
+    print "--Warning: moonimg directory does not contain needed images.\n";
+    print "  '".$moonImagePath."14.gif' is missing.\n";
+  }
 	print "  jpgraph location='$jploc'\n";
+  if (!file_exists($jploc.'src/jpgraph.php')) {
+    print "--Warning: JPgraph not found in jploc='$jploc'\n";
+  }
   if (isset($crextrafile)) {
     print "  Using '$crextrafile' for moon data.\n";
     if(!file_exists($crextrafile)){
@@ -236,8 +283,6 @@ if(isset($_GET['test']) and
   $TST = '';
 }
 
-
-
 if(!isset($doLog)) {$doLog = false;}
 
 include ($jploc."src/jpgraph.php");
@@ -264,11 +309,11 @@ if (!file_exists($cacheFileDir."jpmoon.png") or
 if (!file_exists($cacheFileDir."jpsun.png") or 
     filemtime($cacheFileDir."jpsun.png") <= time() - 3600 or
 		isset($_REQUEST['force']) ) {
-
-	maketransparent("https://umbra.nascom.nasa.gov/images/latest_solisHe_thumbnail.gif",
+# New: https://umbra.nascom.nasa.gov/images/latest_aia_304_tn.gif
+# old: https://umbra.nascom.nasa.gov/images/latest_solisHe_thumbnail.gif
+	maketransparent("https://umbra.nascom.nasa.gov/images/latest_aia_304_tn.gif",
 	    $cacheFileDir."jpsun.png",50,50);
 }
-
 
 //calculations start here
 
@@ -455,34 +500,6 @@ for ($i=0;$i<=24;$i++){$he61[$i]=$moonpos[$i];}
 $he7[0] = round($sunpos[25]);
 for ($i=0;$i<=24;$i++){$he81[$i]=$sunpos[$i];}
 
-if($doLog) { # optional data logging
-  $saveMoonData = array();
-  $saveSunData  = array();
-  foreach ($moonpos as $i => $val) {
-    $thr = $i;
-    if($thr < 10) {$thr = "0$i";}
-    $saveMoonData["$thr:00"] = round($moonazi[$i],1).",".round($val,1);
-  }
-  foreach ($sunpos as $i => $val) {
-    $thr = $i;
-    if($thr < 10) {$thr = "0$i";}
-    $saveSunData["$thr:00"] = round($sunazi[$i],1).",".round($val,1);
-  }
-  $calcMeta = array('date'=>date('Y-m-d'),'lat'=>$lat,'lon'=>$lon,'tz'=>$tz,'version'=>$Version);
-
-  file_put_contents('calc-sunmoon-data.php',
-    "<?php\n" .
-    "# generated by $Version on ".date('r')."\n" .              
-    "# data for date=".date('Y-m-d')." lat=$lat, lon=$lon tz=$tz\n" . 
-    "#\n".
-    "\$calcMeta =".var_export($calcMeta,true).";\n" .
-   "#\n".
-    "\$calcMoon =".var_export($saveMoonData,true).";\n" .
-    "#\n".
-    "\$calcSun =".var_export($saveSunData,true).";\n" .
-    "# -- end --\n"
-                   );
-} # end of optional logging
 
 #
 ##END FUNCTIONS###############################################################################
@@ -490,9 +507,9 @@ if($doLog) { # optional data logging
 /* CREATE SUN PATH */
 
 if (version_compare(PHP_VERSION, '5.2.1', '>')) {                             
-	$sun_info = date_sun_info(strtotime(date("Y/n/j",time())), $lat, $lon);
+	$sun_info = date_sun_info(strtotime(date("Y-n-j",time())), $lat, $lon);
 } else {                                                                      
-	$sun_info = date_sun_info(strtotime(date("Y/n/j",time())), $lon, $lat);  // A bug in the earlier versions.
+	$sun_info = date_sun_info(strtotime(date("Y-n-j",time())), $lon, $lat);  // A bug in the earlier versions.
 }
 
 $day=$sun_info["sunset"]-$sun_info["sunrise"];
@@ -510,9 +527,12 @@ $dl = $final_hours = floor($hours) . ":" . $final_minutes;
 $sr = date($timeOnlyFormat,$sun_info["sunrise"]);
 $zen = date($timeOnlyFormat,$sun_info["transit"]);
 $ss = date($timeOnlyFormat,$sun_info["sunset"]);
-
+if($doLog){$Dtrack .= "-----Main Sun position-----\n";}
 $b = array();
 $a = ($sun_info["transit"]-36000);
+if($doLog){$Dtrack .= show_info($sun_info) .
+          "UnixTS,Lat,Long,Local,UTC,Y M D h m s,az,el\n";
+          }
 for ($i=0;$i<=25;$i++){
   $a=$a+3600;
   $b[] = $a;
@@ -524,10 +544,15 @@ foreach ($b as $v) {
 }
 
 //Hi position
-$sun_info = date_sun_info(strtotime("21 June ".date("Y",time())), $lat,$lon);
+if($doLog){$Dtrack .= "-----21 Jun Sun position-----\n";}
+$dtemp = strtotime( date("Y").'0621T13:00:00');
+$sun_info = date_sun_info($dtemp, $lat,$lon);
 $b = array();
 $a = ($sun_info["transit"]-36000);
-for ($i=0;$i<=49;$i++){
+if($doLog){$Dtrack .= show_info($sun_info) . 
+          "UnixTS,Lat,Long,Local,UTC,Y M D h m s,az,el\n";
+          }
+for ($i=0;$i<=48;$i++){
   $a=$a+1800;
   $b[] = $a;
 }
@@ -538,9 +563,14 @@ foreach ($b as $v) {
 }
 
 // Autumnal Eq
-$sun_info = date_sun_info(strtotime("21 September ".date("Y",time())),$lat,$lon);
+if($doLog){$Dtrack .= "-----21 Sep Sun position-----\n";}
+$dtemp = strtotime( date("Y").'0921T13:00:00'.date('P'));
+$sun_info = date_sun_info($dtemp, $lat,$lon);
 $b = array();
-  $a = ($sun_info["transit"]-36000);
+$a = ($sun_info["transit"]-36000);
+if($doLog){$Dtrack .= show_info($sun_info) .
+          "UnixTS,Lat,Long,Local,UTC,Y M D h m s,az,el\n";
+          }
 for ($i=0;$i<=25;$i++){
   $a=$a+3600;
   $b[] = $a;
@@ -552,9 +582,14 @@ foreach ($b as $v) {
 }
 
 //Low position
-$sun_info = date_sun_info(strtotime("21 December ".date("Y",time())), $lat,$lon);
+if($doLog){$Dtrack .= "-----21 Dec Sun position-----\n";}
+$dtemp = strtotime( date("Y").'1221T13:00:00'.date('P'));
+$sun_info = date_sun_info($dtemp, $lat,$lon);
 $b = array();
 $a = ($sun_info["transit"]-32400);
+if($doLog){$Dtrack .= show_info($sun_info) .
+          "UnixTS,Lat,Long,Local,UTC,Y M D h m s,az,el\n";
+          }
 for ($i=0;$i<=25;$i++){
   $a=$a+3600;
   $b[] = $a;
@@ -576,16 +611,116 @@ if(isset($clientrawextra[560]) and isset($clientrawextra[558])) {
 /* CREATE ACTUAL SUN POSITION */
 $time = time();
 
-// For testing using https://aa.usno.navy.mil/data/docs/AltAz.php & PHP function date_sun_info() results - (for Jim 90° 4' & 43° 48' & 5 hrs W)
-/*
-$testHr = 19;
-$testMin = 25;
-$time = mktime($testHr,$testMin,0,date('m'),date('j'),date('Y'));
-*/
+$setXzero = false; # default use 0..360 for graph X axis
+
+if($lat > 0) {
+  #northern hemisphere
+  $xMin = intval(min($az[6],$az0[6],$tm21[6]));
+  $xMax = intval(max($az[18],$az0[18],$tm21[18]));
+  $subtitleExtra = "sun=".intval($az[6])."..".intval($az[12])."..".intval($az[18]).
+    " Summer=".intval($az0[6])."..".intval($az0[12])."..".intval($az0[18]).
+    " moon=".intval($tm21[6])."..".intval($tm21[12])."..".intval($tm21[18]);
+} else {
+  # souhern hemisphere
+  $xMin = intval(min($az[6],$az1[6],$tm21[6]));
+  $xMax = intval(max($az[18],$az1[18],$tm21[18]));
+  $subtitleExtra = "sun=".intval($az[6])."..".intval($az[12])."..".intval($az[18]).
+    " Winter=".intval($az1[6])."..".intval($az1[12])."..".intval($az1[18]).
+    " moon=".intval($tm21[6])."..".intval($tm21[12])."..".intval($tm21[18]);
+}
+
+if(strlen($subtitle)>0){
+  $subtitle .= "\nxMin=$xMin, xMax=$xMax ".$subtitleExtra;
+}
+
+if($az[12] >= $az[18]) {$setXzero= true;}
 
 $pos = sun_pos($time, $lat, $lon);
 $az2[0] = $pos[0];
 $he2[0] = $pos[1];
+
+if($doLog) { # optional data logging
+  $saveMoonData = array();
+  $saveSunData  = array();
+  $saveJunData = array();
+  $saveDecData = array();
+  $saveEquData = array();
+  
+  foreach ($moonpos as $i => $val) {
+    $thr = $i;
+    if($thr < 10) {$thr = "0$i";}
+    $saveMoonData["$thr:00"] = round($moonazi[$i],1).",".round($val,1);
+    $tAz = fix_long(round($moonazi[$i],1));
+    if($tAz !== round($moonazi[$i],1)) {
+      $saveMoonData["$thr:00"] .= ",(usedAZ=$tAz)";
+    }
+  }
+  foreach ($sunpos as $i => $val) {
+    $thr = $i;
+    if($thr < 10) {$thr = "0$i";}
+    $saveSunData["$thr:00"] = round($sunazi[$i],1).",".round($val,1);
+    $tAz = fix_long(round($sunazi[$i],1));
+    if($tAz !== round($sunazi[$i],1)) {
+      $saveSunData["$thr:00"] .= ",(usedAZ=$tAz)";
+    }
+ }
+  
+  foreach ($he0 as $i => $val) {
+    $thr = $i;
+    if($thr < 10) {$thr = "0$i";}
+    $saveJunData["$thr:00"] = round($az0[$i],1).",".round($val,1);
+    $tAz = fix_long(round($az0[$i],1));
+    if($tAz !== round($az0[$i],1)) {
+       $saveJunData["$thr:00"] .= ",(usedAZ=$tAz)";
+    }
+  }
+ 
+  foreach ($he1 as $i => $val) {
+    $thr = $i;
+    if($thr < 10) {$thr = "0$i";}
+    $saveDecData["$thr:00"] = round($az1[$i],1).",".round($val,1);
+    $tAz = fix_long(round($az1[$i],1));
+    if($tAz !== round($az1[$i],1)) {
+       $saveDecData["$thr:00"] .= ",(usedAZ=$tAz)";
+    }
+  }
+
+    foreach ($he3 as $i => $val) {
+    $thr = $i;
+    if($thr < 10) {$thr = "0$i";}
+    $saveEquData["$thr:00"] = round($az3[$i],1).",".round($val,1);
+    $tAz = fix_long(round($az3[$i],1));
+    if($tAz !== round($az3[$i],1)) {
+       $saveEquData["$thr:00"] .= ",(usedAZ=$tAz)";
+    }
+}
+
+  
+  $calcMeta = array('date'=>date('Y-m-d'),'lat'=>$lat,'lon'=>$lon,'tz'=>$tz,'version'=>$Version);
+
+  file_put_contents('calc-sunmoon-data.php',
+    "<?php\n" .
+    "# generated by $Version on ".date('r')."\n" .              
+    "# data for date=".date('Y-m-d')." lat=$lat, lon=$lon tz=$tz\n" . 
+    "#\n".
+    "\$calcMeta =".var_export($calcMeta,true).";\n" .
+   "#\n".
+    "\$calcMoon =".var_export($saveMoonData,true).";\n" .
+    "#\n".
+    "\$calcSun =".var_export($saveSunData,true).";\n" .
+    "#\n".
+    "\$calcJun =".var_export($saveJunData,true).";\n" .
+     "#\n".
+    "\$calcDec =".var_export($saveDecData,true).";\n" .
+    "#\n".
+    "\$calcEqu =".var_export($saveEquData,true).";\n" .
+   "# -- end --\n"
+                   );
+  if(strlen($Dtrack) > 0) {
+    file_put_contents('sunposa-dtrack.txt',$Dtrack);
+  }
+} # end of optional logging
+
 
 // Create the graph. These two calls are always required
 $graph  = new Graph(500,300,"auto",1);
@@ -595,7 +730,8 @@ $graph->SetFrame(true,'black',0);
 $graph->SetMarginColor('black');
 
 $graph->SetBackgroundGradient('blue',$daycolor,GRAD_HOR,BGRAD_PLOT);                        
-$suncolor = "yellow";  
+$suncolor = "yellow";
+$skyword = 'n/a';
 								
 if ($TST === 'SN' or ($TST === '' and $az2[0] == 180)) { 
 	$skyword = LT('Solar Noon');
@@ -644,101 +780,127 @@ $DS = chr(176); // chr(176) = degree sign in ISO-8859-1
 $graph->SetMarginColor("black");
 $fecha = date($dtstring, time()) . " ".LT("local time");
 $graph->SetClipping();
-$graph->SetScale( "linlin",0,90,40,320);
+if(!$setXzero){
+  $graph->SetScale( "linlin",0,$maxElevation,0,360);
+} else {
+  $graph->SetScale( "linlin",0,$maxElevation,-180,180);
+}
 $graph ->xgrid->Show( true,true);
 $graph ->xgrid->SetColor('#99999');
+
 $graph ->ygrid->Show( true,true);
 $graph ->ygrid->SetColor('#99999');
 $graph->setTickDensity(TICKD_NORMAL,TICKD_DENSE);
 $graph->xaxis->SetPos("min");
+$graph->yaxis->SetPos("min");
 $graph->legend->Hide();
+
+if($setXzero) {
+  # We're using -180..180 to display due to JPgraph need to have ascending X-axis values
+  # but we'll show the 0..360 X-axis legend as that is what the actual data uses.
+  # The fix_long() routine converts 0..360 longitudes into -180..180 to fulfill the JPgraph needs
+  # and this allows good presentation for Southern hemisphere locations (and any location that
+  # would create a non-ascending series of longitudes)
+  $pseudoXaxis = array();
+  for ($i=0;$i<=360;$i++) {
+    $pseudoXaxis[] = $i;
+  }
+  $graph->xaxis->SetTickLabels($pseudoXaxis); # display 0..360 for X-axis tick legends
+} 
+
+// Top Title
+if($subtitle !== '') {$subtitle = "\n".$subtitle;} # add testing output if needed
+
+$graph->title->Set(LT('Sun/Moon position').': '.$fecha.' - '.$skyword.$subtitle);      
+$graph->title->SetFont(FF_ARIAL,FS_BOLD,9);
+$graph->title->SetColor($legendColor,'black','white');
 
 $graph->yaxis->SetFont(FF_ARIAL,FS_BOLD,7);
 $graph->yaxis->SetColor('white');
+
 $graph->xaxis->SetFont(FF_ARIAL,FS_BOLD,7);
 $graph->xaxis->SetColor('white');
+
 $graph->footer->left->SetFont(FF_ARIAL,FS_BOLD,9);
 $graph->footer->left->Set(LT("Sun AZ").": $az2[0]$DS\n".LT("Moonrise").": $mrise"."\n".LT("Sunrise").": $sr");
-$graph->footer->left->SetColor("darkorange");
+$graph->footer->left->SetColor($legendColor);
 
 $graph->footer->center->SetFont(FF_ARIAL,FS_BOLD,9);
 $graph->footer->center->Set( LT("Zenith") . ": $zen\n".LT("Illumination").": $millum"."\n" . LT("Sunlight") . ": $dl " . LT("hrs"));
-$graph->footer->center->SetColor("darkorange");
+$graph->footer->center->SetColor($legendColor);
+
 $graph->footer->right->SetFont(FF_ARIAL,FS_BOLD,9);
 $graph->footer->right->Set(LT("Sun EL").": $he2[0]$DS\n".LT("Moon EL").": $he5[0]$DS"."\n".LT("Sunset").": $ss");
-$graph->footer->right->SetColor("darkorange");
+$graph->footer->right->SetColor($legendColor);
+
+// Create the line plot Sun
+$plot = new ScatterPlot($he, fix_long($az));
+$plotcolor = 'orange';
+$plot->SetColor($plotcolor);
+$plot->mark->SetType(MARK_FILLEDCIRCLE);
+$plot->mark->SetFillColor($plotcolor);
+$plot->mark->SetWidth(1);
+$plot->link->Show();
+$plot->link->SetStyle('dashed');
+$plot->link->SetColor($plotcolor);
+
+// Create the line plot Jun 21
+$plot0 = new ScatterPlot($he0, fix_long($az0));
+$plot0color = 'green';
+$plot0->SetColor($plot0color);
+$plot0->mark->SetType(MARK_FILLEDCIRCLE);
+$plot0->mark->SetFillColor($plot0color);
+$plot0->mark->SetWidth(1);
+$plot0->link->Show();
+$plot0->link->SetStyle('solid');
+$plot0->link->SetColor($plot0color);
+
+// Create the line plot Dec 21
+$plot1 = new ScatterPlot($he1, fix_long($az1));
+$plot1color = 'magenta';
+$plot1->SetColor($plot1color);
+$plot1->mark->SetType(MARK_FILLEDCIRCLE);
+$plot1->mark->SetFillColor($plot1color);
+$plot1->mark->SetWidth(1);
+$plot1->link->Show();
+$plot1->link->SetStyle('solid');
+$plot1->link->SetColor($plot1color);
+
+// Create the line plot Equinox
+$plot2 = new ScatterPlot($he3, fix_long($az3));
+$plot2color = 'cyan';
+$plot2->SetColor($plot2color);
+$plot2->mark->SetType(MARK_FILLEDCIRCLE);
+$plot2->mark->SetFillColor($plot2color);
+$plot2->mark->SetWidth(1);
+$plot2->link->Show();
+$plot2->link->SetStyle('solid');
+$plot2->link->SetColor($plot2color);
+
+// Create the line plot Moon
+$plot3 = new ScatterPlot($he61,fix_long($tm21));
+$plot3color = 'white';
+$plot3->SetColor($plot3color);
+$plot3->mark->SetType(MARK_FILLEDCIRCLE);
+$plot3->mark->SetFillColor($plot3color);
+$plot3->mark->SetWidth(1);
+$plot3->link->Show();
+$plot3->link->SetStyle('dashed');
+$plot3->link->SetColor($plot3color);
 
 
-/* # old, multicolor with bad positioning for moon info
-$graph->footer->left->SetFont(FF_ARIAL,FS_BOLD,9);
-$graph->footer->left->Set(LT("Sun AZ").": $az2[0]$DS\n\n".LT("Sunrise").": $sr");
-$graph->footer->left->SetColor("darkorange");
-$graph->footer->center->SetFont(FF_ARIAL,FS_BOLD,9);
-$graph->footer->center->Set( LT("Zenith") . ": $zen\n\n" . LT("Sunlight") . ": $dl " . LT("hrs"));
-$graph->footer->center->SetColor("darkorange");
-$graph->footer->right->SetFont(FF_ARIAL,FS_BOLD,9);
-$graph->footer->right->Set(LT("Sun EL").": $he2[0]$DS\n\n".LT("Sunset").": $ss");
-$graph->footer->right->SetColor("darkorange");
-
-$txt3 =new Text(LT("Moon EL").": $he5[0]$DS");
-$txt3->SetFont(FF_ARIAL,FS_BOLD,9);
-$txt3->SetPos(418,274);
-$txt3->SetColor( "cyan");
-$graph->AddText($txt3);	
-$txt4 =new Text(LT("Moonrise").": $mrise");
-$txt4->SetFont(FF_ARIAL,FS_BOLD,9);
-$txt4->SetPos(2,274);
-$txt4->SetColor( "cyan");
-$graph->AddText($txt4);	
-$txt5 =new Text(LT("Illumination").": $millum");
-$txt5->SetFont(FF_ARIAL,FS_BOLD,9);
-$txt5->SetPos(202,274);
-$txt5->SetColor( "cyan");
-$graph->AddText($txt5);	
-//*/
-
-// Create the line plot
-	$plot = new LinePlot($he, $az);
-	$plot->SetColor("orange");
-	$plot->SetWeight(3);
-	$plot->SetStyle('dashed');
-
-// Create the line plot
-	$plot0 = new LinePlot($he0, $az0);
-	$plot0->SetColor("green");
-	$plot0->SetWeight(1);
-
-// Create the line plot
-	$plot1 = new LinePlot($he1, $az1);
-	$plot1->SetColor("magenta");
-	$plot1->SetWeight(1);
-
-// Create the line plot
-	$plot2 = new LinePlot($he3, $az3);
-	$plot2->SetColor("cyan");
-	$plot2->SetWeight(1);
-
-// Create the line plot for Moon path
-	$plot3 = new LinePlot($he61,$tm21);
-	$plot3->SetColor("white");
-	$plot3->SetWeight(1);
-	$plot3->SetStyle('dashed');
-
-// Top Title	
-$graph->title->Set(LT('Sun/Moon position').': '.$fecha.' - '.$skyword);      
-$graph->title->SetFont(FF_ARIAL,FS_BOLD,9);
-$graph->title->SetColor('orange','black','white');
-
-// Create the scatter plot
+// Create the Sun plot
 if ($he2[0] == -1) $he2[0]++;             // Push the sun back up on the horizon when at -1 which is sunrise/set
-$sp1 = new ScatterPlot($he2,$az2);
+$sp1 = new ScatterPlot($he2,fix_long($az2));
 $sp1->mark->SetType(MARK_IMG,$cacheFileDir.'jpsun.png',0.8);
 //	$sp1->mark->SetType(MARK_FILLEDCIRCLE);
 $sp1->mark->SetWidth(8);
 $sp1->SetImpuls();
 $sp1->mark->SetFillColor($suncolor);
 $sp1->mark->SetColor($suncolor);
-$sp2 = new ScatterPlot($he5,$maz);
+
+// position moon image as mark on moon plot
+$sp2 = new ScatterPlot($he5,fix_long($maz));
 $sp2->mark->SetType(MARK_IMG,$cacheFileDir.'jpmoon.png',0.6);	
 
 // Add plots to graph
@@ -750,25 +912,31 @@ $graph->Add($plot);
 if($he2[0]>-1) {$graph->Add($sp1);}
 $graph->Add($sp2);
 
-// Add labels for equinox peaks	                
-$txt =new Text(LT("Jun 21"));
+// Add labels for equinox/solstice peaks	
+$labelPos = ($lat>0)?165:-25;
+$labelJune = ($lat>0)?"Jun 21":"Dec 21";
+$labelDec = ($lat>0)?"Dec 21":"Jun 21";
+
+// summer solistice
+$txt =new Text(LT($labelJune));
 $txt->SetFont(FF_ARIAL,FS_BOLD,7);
-#$txt->SetPos( 237,40);
-$txt->SetScalePos( 170,max($he0)+5);
+$txt->SetScalePos( $labelPos,max($he0)+5);
 $txt->SetColor( "green");
 $graph->AddText($txt);	
 
-$txt1 =new Text(LT("Dec 21"));
+// winter solistice
+$txt1 =new Text(LT($labelDec));
 $txt1->SetFont(FF_ARIAL,FS_BOLD,7);
 #$txt1->SetPos( 237,173);
-$txt1->SetScalePos( 170,max($he1)+5);
+$txt1->SetScalePos( $labelPos,max($he1)+5);
 $txt1->SetColor( "magenta");
 $graph->AddText($txt1);	
 
+// equinox 
 $txt2 =new Text(LT("Equinox"));
 $txt2->SetFont(FF_ARIAL,FS_BOLD,7);
 #$txt2->SetPos( 233,96);
-$txt2->SetScalePos( 170,max($he3)+5);
+$txt2->SetScalePos( $labelPos+10,max($he3)+5);
 $txt2->SetColor( "cyan");
 $graph->AddText($txt2);
 
@@ -776,6 +944,27 @@ $graph->AddText($txt2);
 $graph->Stroke();
 
 #------------ functions -------------------
+
+function fix_long($inLon) {
+  # convert 0..360 to -180..+180 values for longitude
+  global $setXzero;
+  if(!$setXzero) {return($inLon);}  # use 0..360 returns with no change
+  
+  if(is_array($inLon)) {
+    $t = array();
+    foreach ($inLon as $i => $val) {
+      $t[] = -((intval($val)+180)%360 -180); # convert 0..360 to -180..+180 longitude array
+    }
+    return($t);
+  } else { # single value
+    $t = -((intval($inLon)+180)%360 -180);  # convert 0..360 to -180..+180 longitude single value
+    return($t);
+  }
+  
+}
+
+# -------------------------------------------------------------------
+
 function saveImage($oldfile,$newfile,$width,$height)
 // Save Image and re-size
 {
@@ -787,6 +976,8 @@ function saveImage($oldfile,$newfile,$width,$height)
 	imagepng($im,$newfile);
 	imagedestroy($img);
 }
+
+# -------------------------------------------------------------------
 
 function maketransparent($oldfile,$newfile,$width,$height)
 // Turn black background transparent and re-size
@@ -822,6 +1013,16 @@ function maketransparent($oldfile,$newfile,$width,$height)
 	imagepng($img,$newfile);
 	imagedestroy($img);
 }
+
+function show_info($sun) {
+
+  $output = "-----Sunrise: local: ".$sun['sunrise']." ".date('c',$sun['sunrise'])." UTC: ".gmdate('c',$sun['sunrise'])." -----\n";
+  $output .= "-----Transit: local: ".$sun['transit']." ".date('c',$sun['transit'])." UTC: ".gmdate('c',$sun['transit'])." -----\n";
+  $output .= "-----Sunset:  local: ".$sun['sunset']." ".date('c',$sun['sunset'])." UTC: ".gmdate('c',$sun['sunset'])." -----\n";
+  return($output);
+}
+
+# -------------------------------------------------------------------
 
 // FUNCTION - get data using cURL
 function get_file_contents($url)    {
@@ -861,6 +1062,8 @@ function get_file_contents($url)    {
 }// end get_file_contents
 
 
+# -------------------------------------------------------------------
+
 function set_tz ($TZ){
 	if (phpversion() >= "5.1.0") {
 			date_default_timezone_set($TZ);
@@ -868,7 +1071,14 @@ function set_tz ($TZ){
 			putenv("TZ=" . $TZ);
 	}
 }
+
+# -------------------------------------------------------------------
+
 function sun_pos($UnixTimestamp, $latitude, $longitude) {
+  global $Dtrack,$doLog;
+  if($doLog) {
+    $Dtrack .= "$UnixTimestamp,$latitude,$longitude,".date('c',$UnixTimestamp).",".gmdate('c',$UnixTimestamp).",".gmdate('Y n j G i s',$UnixTimestamp);
+  }
 	$year = date("Y",$UnixTimestamp);
 	$month = date("n",$UnixTimestamp);
 	$day = date("j",$UnixTimestamp);
@@ -887,10 +1097,10 @@ function sun_pos($UnixTimestamp, $latitude, $longitude) {
 	$y = sin(deg2rad($E)) * sqrt(1 - $e*$e);
 	$r = sqrt($x*$x + $y*$y);
 	$v = rad2deg(atan2( deg2rad($y), deg2rad($x)) );
-	$lon = $v + $w;
-	$lon = fmod($lon, 360);
-	$x_rect = $r * cos(deg2rad($lon));
-	$y_rect = $r * sin(deg2rad($lon));
+	$tlon = $v + $w;
+	$tlon = fmod($tlon, 360);
+	$x_rect = $r * cos(deg2rad($tlon));
+	$y_rect = $r * sin(deg2rad($tlon));
 	$z_rect = 0.0;
 	$z = 0.0;
 	$x_equat = $x_rect;
@@ -908,11 +1118,17 @@ function sun_pos($UnixTimestamp, $latitude, $longitude) {
 	$xhor = $x * cos(deg2rad(90) - deg2rad($latitude)) - $z * sin(deg2rad(90) - deg2rad($latitude));
 	$yhor = $y;
 	$zhor = $x * sin(deg2rad(90) - deg2rad($latitude)) + $z * cos(deg2rad(90) - deg2rad($latitude));
-	$azimuth  = round(rad2deg(atan2($yhor, $xhor)) + 180);
-	$altitude = round(rad2deg(asin($zhor )));
+	$azimuth  = round(rad2deg(atan2($yhor, $xhor)) + 180,1);
+	$altitude = round(rad2deg(asin($zhor )),1);
+  if($doLog) {
+    $Dtrack .= ",$azimuth,$altitude\n";
+  }
 	$pos = array($azimuth, $altitude);
 	return $pos;
 }
+
+
+# -------------------------------------------------------------------
 
 function getTimestamp ($val) {
 	list ($hour,$min) = preg_split("/:/",$val);
@@ -920,6 +1136,7 @@ function getTimestamp ($val) {
 	return($ttl);
 }
 
+# -------------------------------------------------------------------
 
 function out_time ( $seconds , $mode = false) {
 	$uday = (3600 * 24);
@@ -1004,6 +1221,8 @@ function out_time ( $seconds , $mode = false) {
 	return ($out_string);
 }
 
+# -------------------------------------------------------------------
+
 function time24to12 ($val) {
 	if (strlen($val) == 5 ) {
 			$val .= ":00";
@@ -1016,6 +1235,8 @@ function time24to12 ($val) {
 
 function LT ($str) {
   global $LanguageLookup;
+  #Language translation lookup function<br />
+  #languages from sunposa-lang.php table
   
   if(isset($LanguageLookup[$str])) {
     list($trans,$comment) = explode('|',$LanguageLookup[$str].'|');
@@ -1024,6 +1245,8 @@ function LT ($str) {
     return($str);
   }
 }
+
+# -------------------------------------------------------------------
 
 function set_legends($lang) {
   #
@@ -1079,7 +1302,6 @@ function set_legends($lang) {
 
 
 # ------------------------------------------------------
-#
 # Astronomical functions from get-USNO-sunmoon.php
 # ------------------------------------------------------
 
@@ -1258,13 +1480,16 @@ class calcMoonPhase
     $this->sunangdia = $SunAng; // Sun's angular diameter (degrees)
   }
 
+  # -------------------------------------------------------------------
+
   private function fixangle($a)
   {
     return ($a - 360 * floor($a / 360));
   }
 
-  //  KEPLER  --   Solve the equation of Kepler.
+ # -------------------------------------------------------------------
 
+ //  KEPLER  --   Solve the equation of Kepler.
   private function kepler($m, $ecc)
   {
     $epsilon = 0.000001; // 1E-6
@@ -1277,6 +1502,8 @@ class calcMoonPhase
     while (abs($delta) > $epsilon);
     return $e;
   }
+
+  # -------------------------------------------------------------------
 
   /*  Calculates  time  of  the mean new Moon for a given
   base date.  This argument K to this function is the
@@ -1298,6 +1525,8 @@ class calcMoonPhase
 			+ 0.00033 * sin(deg2rad(166.56 + 132.87 * $t - 0.009173 * $t2));
     return $nt1;
   }
+
+  # -------------------------------------------------------------------
 
   /*  Given a K value used to determine the mean phase of
   the new moon, and a phase selector (0.0, 0.25, 0.5,
@@ -1369,7 +1598,9 @@ class calcMoonPhase
     return $pt;
   }
 
-  /* 	Find time of phases of the moon which surround the current date.
+ # -------------------------------------------------------------------
+
+ /* 	Find time of phases of the moon which surround the current date.
   Five phases are found, starting and
   ending with the new moons which bound the  current lunation.
   */
@@ -1412,11 +1643,15 @@ class calcMoonPhase
     foreach($data as $v) $this->quarters[] = ($v - 2440587.5) * 86400; // convert to UNIX time
   }
 
-  /*  Convert UNIX timestamp to astronomical Julian time (i.e. Julian date plus day fraction).  */
+  # -------------------------------------------------------------------
+
+/*  Convert UNIX timestamp to astronomical Julian time (i.e. Julian date plus day fraction).  */
   private function utctojulian($ts)
   {
     return $ts / 86400 + 2440587.5;
   }
+
+  # -------------------------------------------------------------------
 
   private function get_phase($n)
   {
@@ -1424,7 +1659,9 @@ class calcMoonPhase
     return $this->quarters[$n];
   }
 
-  /* Public functions for accessing results */
+  # -------------------------------------------------------------------
+
+/* Public functions for accessing results */
   function phase()
   {
     return $this->phase;
@@ -1529,6 +1766,8 @@ class calcMoonPhase
     }
   }
 } // end class MoonPhase
+
+
 /******************************************************************************
 * The following is a PHP implementation of the JavaScript code found at:      *
 * http://bodmas.org/astronomy/riset.html                                      *
@@ -2212,5 +2451,7 @@ class calcMoonRiSet
 } // end class MoonRiSet
 
 # --- end of functions from get-USNO-sunmoon.php
+# -------------------------------------------------------------------
+
 
 # leave closing PHP tag off for image script
