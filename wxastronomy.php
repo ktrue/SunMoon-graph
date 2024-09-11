@@ -29,6 +29,9 @@
 ############################################################################
 // Version 1.01 - 22-Jan-2012 - fixes for mixed date format translations
 // Version 1.02 - 26-Aug-2024 - add optional sunposa.php display
+// Version 1.03 - 01-Sep-2024 - fix display of WD moondetail1/moondetail2
+// Version 1.04 - 05-Sep-2024 - simplify sunposa.php display logic
+// Version 1.05 - 11-Sep-2024 - additional sunposa.php include mods
 require_once("Settings.php");
 require_once("common.php");
 ############################################################################
@@ -273,23 +276,21 @@ if(isset($SITE['WXsoftware']) and $SITE['WXsoftware'] == 'WD') {
 <?php } // end test for Hemisphere ?>
     </tr>
   </table>
-<?php if(file_exists('sunposa.php') and 
-        $SITE['latitude'] > '25.0' and
-        $SITE['latitude'] < '75.0')  { # show sunposa.php graph ?>
+<?php 
+  if(file_exists('sunposa.php')) { 
+  # show sunposa.php graph ?>
   <p style="text-align:center;">&nbsp;<br/>
   <img src="sunposa.php" width="500" height="300" alt="Sun/Moon sky position graph"/>
   </p>
-<?php } else {
-    print "<p>\$SITE['latitude']='".$SITE['latitude']."' is outside range of 25.0 to 75.0 .. unable to display sunposa graphic.</p>\n";  
-    } ?>
+<?php 
+  } ?>
 <p>&nbsp;
-<?php if(file_exists("moondetail1.gif")) { ?>
-<img src="moondetail1.gif" alt="Moon Details from Weather-Display" style="border: white 1px solid" /><br/><br/>
+<?php if(file_exists($SITE['graphImageDir']."moondetail1.gif")) { ?>
+<img src="<?php echo $SITE['graphImageDir']; ?>moondetail1.gif" alt="Moon Details from Weather-Display" style="border: white 1px solid" /><br/><br/>
 <?php }
-      if(file_exists("moondetail2.gif")) { ?>
-<img src="moondetail2.gif" alt="Additional Moon facts from Weather-Display"  style="border: white 1px solid"/>
-<?php } ?>
-</p>
+      if(file_exists($SITE['graphImageDir']."moondetail2.gif")) { ?>
+<img src="<?php echo $SITE['graphImageDir']; ?>moondetail2.gif" alt="Additional Moon facts from Weather-Display"  style="border: white 1px solid"/>
+<?php } ?></p>
 </div>
 <?php } else { // show we need a weather station to be configured for this page
 ?>
