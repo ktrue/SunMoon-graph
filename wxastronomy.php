@@ -32,6 +32,7 @@
 // Version 1.03 - 01-Sep-2024 - fix display of WD moondetail1/moondetail2
 // Version 1.04 - 05-Sep-2024 - simplify sunposa.php display logic
 // Version 1.05 - 11-Sep-2024 - additional sunposa.php include mods
+// Version 1.06 - 12-Sep-2024 - fix Notice errata when no $SITE['graphImageDir'] setting
 require_once("Settings.php");
 require_once("common.php");
 ############################################################################
@@ -285,10 +286,10 @@ if(isset($SITE['WXsoftware']) and $SITE['WXsoftware'] == 'WD') {
 <?php 
   } ?>
 <p>&nbsp;
-<?php if(file_exists($SITE['graphImageDir']."moondetail1.gif")) { ?>
+<?php if(isset($SITE['graphImageDir']) and file_exists($SITE['graphImageDir']."moondetail1.gif")) { ?>
 <img src="<?php echo $SITE['graphImageDir']; ?>moondetail1.gif" alt="Moon Details from Weather-Display" style="border: white 1px solid" /><br/><br/>
 <?php }
-      if(file_exists($SITE['graphImageDir']."moondetail2.gif")) { ?>
+      if(isset($SITE['graphImageDir']) and file_exists($SITE['graphImageDir']."moondetail2.gif")) { ?>
 <img src="<?php echo $SITE['graphImageDir']; ?>moondetail2.gif" alt="Additional Moon facts from Weather-Display"  style="border: white 1px solid"/>
 <?php } ?></p>
 </div>
