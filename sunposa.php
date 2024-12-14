@@ -23,10 +23,11 @@ ini_set('display_errors','1');
 # Version 3.03 - 22-Aug-2024 - add $timeOnlyFormat to specify Sunrise, Sunset, Transit, Moonrise formats
 # Version 3.50 - 28-Aug-2024 - add debug for NASA sun image,mods to gradient backgrounds+legends + legend lang translate
 # Version 3.60 - 11-Sep-2024 - fixes to display Southern Hemisphere graphs, add optional debugging info 
+# Version 3.70 - 14-Dec-2024 - use new method to vingnette the sun image as round and save as transparent GIF
 #
 # NOTE: requires jpgraph 4.4.2+ for operation with PHP 8+
 #
-$Version = 'sunposa.php Version 3.60 - 11-Sep-2024';
+$Version = 'sunposa.php Version 3.70 - 14-Dec-2024';
 // allow viewing of generated source
 
 if ( isset($_REQUEST['sce']) && strtolower($_REQUEST['sce']) == 'view' ) {
@@ -245,9 +246,9 @@ if(isset($_REQUEST['debug']) and $_REQUEST['debug'] = 'y') {
 	}
 	print "\n";
 
-	print "  sun  image cache '".$cacheFileDir.'jpsun.png'." ";
-	if(file_exists($cacheFileDir.'jpsun.png')) {
-		print "exists.  Updated ".date("Y-m-d H:i:s",filemtime($cacheFileDir.'jpsun.png'));
+	print "  sun  image cache '".$cacheFileDir.'jpsun.gif'." ";
+	if(file_exists($cacheFileDir.'jpsun.gif')) {
+		print "exists.  Updated ".date("Y-m-d H:i:s",filemtime($cacheFileDir.'jpsun.gif'));
 	} else {
 		print "does not exist.";
 	}
@@ -306,13 +307,13 @@ if (!file_exists($cacheFileDir."jpmoon.png") or
 	saveImage($moonImage,
 	    $cacheFileDir."jpmoon.png",50,50);
 } 
-if (!file_exists($cacheFileDir."jpsun.png") or 
-    filemtime($cacheFileDir."jpsun.png") <= time() - 3600 or
+if (!file_exists($cacheFileDir."jpsun.gif") or 
+    filemtime($cacheFileDir."jpsun.gif") <= time() - 3600 or
 		isset($_REQUEST['force']) ) {
 # New: https://umbra.nascom.nasa.gov/images/latest_aia_304_tn.gif
 # old: https://umbra.nascom.nasa.gov/images/latest_solisHe_thumbnail.gif
 	maketransparent("https://umbra.nascom.nasa.gov/images/latest_aia_304_tn.gif",
-	    $cacheFileDir."jpsun.png",50,50);
+	    $cacheFileDir."jpsun.gif",50,50);
 }
 
 //calculations start here
@@ -892,7 +893,7 @@ $plot3->link->SetColor($plot3color);
 // Create the Sun plot
 if ($he2[0] == -1) $he2[0]++;             // Push the sun back up on the horizon when at -1 which is sunrise/set
 $sp1 = new ScatterPlot($he2,fix_long($az2));
-$sp1->mark->SetType(MARK_IMG,$cacheFileDir.'jpsun.png',0.8);
+$sp1->mark->SetType(MARK_IMG,$cacheFileDir.'jpsun.gif',0.8);
 //	$sp1->mark->SetType(MARK_FILLEDCIRCLE);
 $sp1->mark->SetWidth(8);
 $sp1->SetImpuls();
@@ -1005,12 +1006,34 @@ function maketransparent($oldfile,$newfile,$width,$height)
 	}
 	
 	$img = imagecreatetruecolor($width,$height);
-	$trans = imagecolorallocate($img, 0, 0, 0);
-  imagefill ($img, 0, 0, $trans);
-	imagecolortransparent($img,$trans);
-	imagecopyresampled($img,$im,0,0,0,0,$width,$height,$info[0],$info[1]);
-	imagetruecolortopalette($img, true, 256);
-	imagepng($img,$newfile);
+  $img2  = imagecreatetruecolor($info[0],$info[1]);
+ 	imagealphablending($img2, false);
+  imagesavealpha($img2, true);
+  imagecopy($img2,$im,0,0,0,0,$info[0],$info[1]);
+  imageRemoveOuterCircle($img2,$info[0],$info[1],20);
+  $trans = imagecolorat($img2,0,0);
+  imagecolortransparent($img2,$trans);
+	imagealphablending($img, false);
+  imagesavealpha($img, true);
+  imagecopyresampled($img,$img2,0,0,0,0,$width,$height,$info[0],$info[1]);
+  #imagecopyresized($img,$img2,0,0,0,0,$width,$height,$info[0],$info[1]);
+  $trans2 = imagecolorat($img,0,0);
+  imagecolortransparent($img,$trans2);
+/* fix transparency from 
+https://stackoverflow.com/questions/48198399/gd-image-library-to-create-transparent-gif-after-manipulation
+*/
+  $wt2= imagesx($img);
+  $ht2 = imagesy($img);
+  for ($xt = 0; $xt < $wt2; $xt++) {
+    for ($yt = 0; $yt < $ht2; $yt++) {
+      $pixel = imagecolorsforindex($img, imagecolorat($img, $xt, $yt));
+      if ($pixel['alpha'] >= 64) {
+          imagesetpixel($img, $xt, $yt, $trans2);
+      }
+    }
+  }
+  
+	imagegif($img,$newfile);
 	imagedestroy($img);
 }
 
@@ -1362,7 +1385,7 @@ function get_sunmoon($useMDY,$myLat,$myLong,$ourTZ) {
   $Debug.= "<!-- moonTransit " . print_r($moonTransit, true) . " -->\n";
   if ($moonTransit > 99999) {
     list($Data['moontransit'], $Data['moontransitdate']) = 
-      explode(" ", date($timeFormat, $moonTransit));
+      explode(" ", date($timeFormat, intval($moonTransit)));
   }
 
   $Data['databy'] = 'calculated';
@@ -2424,8 +2447,8 @@ class calcMoonRiSet
     if (date("j", (integer)$t) == date("j", $t0)) $t = $t0;
     return array(
       $t,
-      date("Hi", $t) ,
-      date("H:i", $t)
+      date("Hi", intval($t)) ,
+      date("H:i", intval($t))
     );
   }
 
@@ -2452,6 +2475,63 @@ class calcMoonRiSet
 
 # --- end of functions from get-USNO-sunmoon.php
 # -------------------------------------------------------------------
+
+# Code from:
+# https://stackoverflow.com/questions/999251/crop-or-mask-an-image-into-a-circle
+// From https://stackoverflow.com/a/23215738/2590508
+
+function hexColorAllocate($im,$hex){
+    $hex = ltrim($hex,'#');
+    $r = hexdec(substr($hex,0,2));
+    $g = hexdec(substr($hex,2,2));
+    $b = hexdec(substr($hex,4,2));
+    return imagecolorallocate($im, $r, $g, $b);
+}
+
+function imageRemoveOuterCircle(&$image,$width=null,$height=null,$margin=0){
+    // 2 arbitrary colors for transparency ; can be redefined if needed
+    $transparentColor1="8d5ca4";
+    $transparentColor2="8d5ca5";
+    
+
+    if(is_null($width)){
+        $width=imagesx($image);
+    }
+    if(is_null($height)){
+        $height=imagesy($image);
+    }
+
+    $mask=imagecreatetruecolor($width, $height);
+    imagefilledrectangle(
+        $mask,
+        0,
+        0,
+        $width,
+        $height,
+        hexColorAllocate($mask,$transparentColor1)
+    );
+    imagefilledellipse(
+        $mask,
+        $width/2,
+        $height/2,
+        $width-$margin,
+        $height-$margin,
+        hexColorAllocate($mask,$transparentColor2)
+    );
+    imagecolortransparent($mask,hexColorAllocate($mask,$transparentColor2));
+    imagecopy(
+        $image,
+        $mask,
+        0,
+        0,
+        0,
+        0,
+        $width,
+        $height
+    );
+    imagedestroy($mask);
+    imagecolortransparent($image,hexColorAllocate($image,$transparentColor1));
+}
 
 
 # leave closing PHP tag off for image script
